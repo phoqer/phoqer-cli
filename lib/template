@@ -88,7 +88,7 @@ const run = (dir = '.') => {
                 console.log('Start replacing content');
                 createDirectoryContents(path.join(process.cwd(), dir, answers.template), answers);
 
-                shell.exec('rm -rf .git')
+                shell.exec('cd ./' + answers.template + ' cd .. && rm -rf .git')
                 console.log('Renaming file');
                 fs.rename(path.join(process.cwd(), dir, answers.template), path.join(process.cwd(), dir, answers.name), err => {
                     if (err) {
