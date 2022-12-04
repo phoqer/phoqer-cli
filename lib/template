@@ -1,0 +1,116 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+const chalk = require('chalk');
+const shell = require('shelljs')
+const inquirer = require('inquirer');
+
+const QUESTIONS = [
+    {
+        name: 'template',
+        type: 'list',
+        message: 'What template would you like to use?',
+        choices: ['react-template'],
+    },
+    {
+        name: 'port',
+        type: 'number',
+        filter(value) {
+            const num = Number(value);
+            return isNaN(num) || num < 3000 ? '' : num;
+        },
+        message: 'Please enter a port name (default 3000):',
+        validate(input) {
+            return Boolean(Number(input));
+        }
+    },
+    {
+        name: 'name',
+        type: 'input',
+        message: 'Please input a new project name in kebab case (ex. author-dashboard, client-dashboard, auth-app etc.):',
+        validate(input) {
+            return Boolean(input.trim().length) && !input.includes(' ') && !/[`!@#$%^&*()_+=\[\]{};':"\\|,.<>\/?~]/.test(input)
+        },
+    },
+    {
+        name: 'title',
+        type: 'input',
+        message: 'Please enter a title (ex. Phoqer dashboard):',
+        validate(input) {
+            return Boolean(input.trim().length)
+        },
+    }
+];
+
+const SKIP_FILES = ['node_modules', '.git'];
+
+const createDirectoryContents = (templatePath, answers) => {
+    const files = fs.readdirSync(templatePath);
+
+    files.forEach(file => {
+        if (SKIP_FILES.indexOf(file) > -1) return;
+
+        const filePath = path.join(templatePath, file);
+        const stats = fs.statSync(filePath);
+
+        if (stats.isFile()) {
+            let contents = fs.readFileSync(filePath, 'utf8');
+
+            contents = contents.replace(/{{phoqer.port}}/gi, answers.port);
+            contents = contents.replace(/{{phoqer.app_name}}/gi, answers.name);
+            contents = contents.replace(/{{phoqer.app_title}}/gi, answers.title);
+
+            fs.writeFileSync(filePath, contents, 'utf8');
+        } else if (stats.isDirectory()) {
+            createDirectoryContents(filePath, answers);
+        }
+    });
+}
+
+const run = (dir = '.') => {
+    inquirer.prompt(QUESTIONS).then(answers => {
+        console.log(chalk.bold.cyan('.\n.\n.\n.\n.\n.\nData that you entered:'));
+        Object.entries(answers).forEach(([key, value]) => {
+            console.log(key + ': ' + chalk.bold.green(value));
+        })
+
+        inquirer.prompt({
+            name: 'accepted',
+            type: 'confirm',
+            message: 'All correct?'
+        }).then(({accepted}) => {
+            if (accepted) {
+                shell.exec('rm -rf ./' + answers.template)
+                shell.exec('git clone https://github.com/phoqer/' + answers.template)
+
+                console.log('Start replacing content');
+                createDirectoryContents(path.join(process.cwd(), dir, answers.template), answers);
+
+                shell.exec('rm -rf .git')
+                console.log('Renaming file');
+                fs.rename(path.join(process.cwd(), dir, answers.template), path.join(process.cwd(), dir, answers.name), err => {
+                    if (err) {
+                        throw err
+                    }
+
+                    console.log('Directory renamed successfully.')
+
+                    inquirer.prompt({
+                        name: 'install',
+                        type: 'confirm',
+                        message: 'Install packages?'
+                    }).then(({install}) => {
+                            if (install) {
+                                shell.exec('cd ./' + answers.name + ' && yarn && cd ..')
+                            }
+                        }
+                    )
+                })
+            }
+        })
+    });
+}
+
+module.exports = run
