@@ -53,5 +53,3 @@ git commit -a --message="v$VERSION"
 
 # push both changes & tag we made
 git push origin main "v$VERSION"
-
-npm publish
